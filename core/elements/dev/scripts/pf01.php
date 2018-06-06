@@ -100,15 +100,26 @@ $handbook_clients_map = array(
         }
         if($log_level > 0) echo 'Log: Successfully Authentication in Planfix. Account: '.$company['pf_account'].'<br>';
         //Successfully Authentication in Planfix (agent's account).
-        //Check ID of Handbook "Автомобили". (pf_id_handbook_cars)
-        if(isset($company['pf_id_handbook_cars'])){ //work with cars
+        //Find Handbook "Автомобили" and define ID. (pf_name_handbook_cars)
+        $handBookCarsId = -1;
+        if($log_level > 1) echo 'Log: Try find Handbook: '.$company['pf_name_handbook_cars'].'<br>';
+            $method = 'handbook.getList';
+            $params = array(
+                'account' => $company['pf_account']
+            );
+            $result = $PF->api($method, $params);
+        if($result['success'] != 1) echo 'Log: Error until find Handbook:'.$company['pf_name_handbook_cars'];
+        else{
+            $handBookCarsId = $result['data']['handbooks']['handbook']['id'];
+        }
+        if(isset($handBookCarsId) && $handBookCarsId != -1){ //work with cars
         //Getting the structure of Handbook
-            if($log_level > 1) echo 'Log: Try get structure of Handbook #'.$company['pf_id_handbook_cars'].'<br>';
+            if($log_level > 1) echo 'Log: Try get structure of Handbook #'.$handBookCarsId.'<br>';
             $method = 'handbook.getStructure';
             $params = array(
-                'handbook' => array('id' => $company['pf_id_handbook_cars']));
+                'handbook' => array('id' => $handBookCarsId));
             $struct_handbook = $PF->api($method, $params);
-            if($struct_handbook['success'] != 1) echo 'Log: Error until getting the structure of Handbook #'.$company['pf_id_handbook_cars'];
+            if($struct_handbook['success'] != 1) echo 'Log: Error until getting the structure of Handbook #'.$handBookCarsId;
             else{
                 //Filling $handbook_cars_map array. Paste id of Handbook's fields
                 foreach ($struct_handbook['data']['handbook']['fields']['field'] as $key => $field){
@@ -123,7 +134,7 @@ $handbook_clients_map = array(
              //   print_r($handbook_cars_map);
              //   echo '</pre>';
             }
-            if($log_level > 0) echo 'Log: Try select from Handbook #'.$company['pf_id_handbook_cars'].'. Try get Cars<br>';
+            if($log_level > 0) echo 'Log: Try select from Handbook #'.$handBookCarsId.'. Try get Cars<br>';
             $pageNum = 1;
             $cars_planfix = array();
             while(true){
@@ -131,7 +142,7 @@ $handbook_clients_map = array(
                 $params = array(
                     'pageCurrent' => $pageNum,
                     'pageSize' => 100,
-                    'handbook' => array('id' => $company['pf_id_handbook_cars']));
+                    'handbook' => array('id' => $handBookCarsId));
                 $result = $PF->api($method, $params);
                 if(!isset($result['data']['records']['record'])) break; //если записи в справочнике закончились - выйти.
                 $cars_planfix = array_merge($cars_planfix, $result['data']['records']['record']);
@@ -141,7 +152,7 @@ $handbook_clients_map = array(
             //echo '<pre>';
             //print_r($cars_planfix);
             //echo '</pre>';
-            if($log_level > 0) echo 'Log: End work with Handbook #'.$company['pf_id_handbook_cars']. ', Fetched '.count($cars_planfix).' records from Handbook.<br>';
+            if($log_level > 0) echo 'Log: End work with Handbook #'.$handBookCarsId. ', Fetched '.count($cars_planfix).' records from Handbook.<br>';
             //Getting cars of company from db
             $carsDb = $pdo->getCollection('Cars', array('company_id' => $company['id']));
             //echo 'carsDb<pre>';
@@ -154,7 +165,7 @@ $handbook_clients_map = array(
                 $param = array(
                     'pf_handbook_key' => $car_planfix['key'], //key of car in handbook
                     'company_id' => $company['id'],
-                    'pf_handbook_id' => $company['pf_id_handbook_cars'],
+                    'pf_handbook_id' => $handBookCarsId,
                 );
                 foreach($car_planfix['customData']['customValue'] as $key => $car_fields){
                     foreach($handbook_cars_map as $db_field => $pf_field){
@@ -172,7 +183,7 @@ $handbook_clients_map = array(
                 $context = 'dev';
                 //select needed processor (create or update)
                 foreach($carsDb as $key => $carDb){
-                    if(($carDb['company_id'] == $company['id'] && ($carDb['pf_handbook_id'] == $company['pf_id_handbook_cars']) && ($carDb['pf_handbook_key'] == $car_planfix['key']))){
+                    if(($carDb['company_id'] == $company['id'] && ($carDb['pf_handbook_id'] == $handBookCarsId) && ($carDb['pf_handbook_key'] == $car_planfix['key']))){
                         $action = 'cars/update';
                         $param = array_merge($carDb,$param);
                         break;
