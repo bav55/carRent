@@ -1,0 +1,23 @@
+# IntelliJ project files
+.idea/
+*.iml
+out
+gen
+
+# ignore MODX files
+/assets/*
+/connectors/*
+/core/*
+/8IkRBJmanager/*
+/setup/*
+/config.core.php
+/index.php
+/.htaccess
+
+# ignore node modules
+/node_modules/
+
+# do not ignore
+!/assets/dev/
+!/assets/web/
+!/core/elements/
