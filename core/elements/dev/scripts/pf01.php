@@ -24,9 +24,6 @@ $pdo = $modx->getService('pdoFetch');
 $pdo->setConfig(array(
 	'class' => 'Company',
 	'loadModels' => 'carRent',
-	'select' => array(
-		'Company' => '*',
-	),
 ));
 
 $log_level = 2;
@@ -298,6 +295,158 @@ $handbook_clients_map = array(
             }
             if($log_level > 0) echo 'Log: Clients - is completed.<br>';
         } //клиенты
+        //get information about bookings
+        //  get needed IDS from Planfix
+        $projectRent_id     = -1; //ID of "Rent" project
+        $projectRepair_id   = -1; //ID of "Repair" project
+        $analiticBooking_id = -1; //ID of "Car Booking" analitic
+        $cf_auto_id         = -1; //ID of custom field "Car" from task's template "Rent"
+        $dateBegin_id       = -1; //ID of custom field of analitic (date_begin)
+        $dateEnd_id       = -1; //ID of custom field of analitic (date_end)
+
+        if($log_level > 1) echo 'Log: Try get Projects from Planfix.<br>';
+        $method = 'project.getList';
+        $params = array(
+            'account' => $company['pf_account'],
+            'pageSize' => 100,
+            'pageCurrent' => 1
+        );
+        $result = $PF->api($method, $params);
+        if($result['success'] != 1) echo 'Log: Error until get Projects from Planfix.';
+        else{
+            foreach($result['data']['projects']['project'] as $key => $project){
+                if($project['title'] == $company['pf_name_project_rent']){$projectRent_id = $project['id']; continue;}
+                if($project['title'] == $company['pf_name_project_repair']){$projectRepair_id = $project['id']; continue;}
+            }
+            if(($projectRent_id == -1) || ($projectRepair_id == -1)) echo 'Log: Error. Not exist ID of Project(s) from Planfix. (projectRent_id = '.$projectRent_id.'), (projectRepair_id = '.$projectRepair_id.')';
+        }
+
+        if($log_level > 1) echo 'Log: Try get Analitic "'.$company['pf_name_analitic_booking'].'" from Planfix.<br>';
+        $method = 'analitic.getList';
+        $params = array(
+            'account' => $company['pf_account']
+        );
+        $result = $PF->api($method, $params);
+        if($result['success'] != 1) echo 'Log: Error until get Analitic from Planfix.';
+        else{
+            foreach($result['data']['analitics']['analitic'] as $key => $analitic){
+                if($analitic['name'] == $company['pf_name_analitic_booking']){
+                    $analiticBooking_id = $analitic['id'];
+                    //get options by this analitic
+                    if($log_level > 1) echo 'Log: Try get options for Analitic "'.$company['pf_name_analitic_booking'].'" from Planfix.<br>';
+                    $method = 'analitic.getOptions';
+                    $params = array(
+                        'analitic' => array('id' => $analiticBooking_id)
+                    );
+                    $result_options = $PF->api($method, $params);
+                    if($result_options['success'] != 1) echo 'Log: Error until get Analitic from Planfix.';
+                    else{
+                        $dateBegin_id = $result_options['data']['analitic']['fields']['field'][0]['id'];
+                        $dateEnd_id = $result_options['data']['analitic']['fields']['field'][1]['id'];
+                    }
+                    if(($dateBegin_id == -1) || ($dateEnd_id == -1)) echo 'Log: Error get options for analitic (dateBegin and dateEnd).<br>';
+                    break;
+                }
+            }
+            if($analiticBooking_id == -1) echo 'Log: Error. Not exist ID of Analitic from Planfix.';
+        }
+
+        if($log_level > 1) echo 'Log: Try get Task (Rent Project) for getting IDx of Custom Fields from Planfix.<br>';
+        $method = 'task.getList';
+        $params = array(
+            'pageSize' => 1,
+            'pageCurrent' => 1,
+            'project' => array('id' => $projectRent_id),
+            'target' => 'all'
+        );
+        $result = $PF->api($method, $params);
+        if($result['success'] != 1) echo 'Log: Error until get Task (Rent Project) for getting IDx of Custom Fields from Planfix.';
+        else{
+            foreach($result['data']['tasks']['task']['customData'] as $key => $cField){
+                if($cField['field']['name'] == $company['pf_name_customField_car'])     {$cf_auto_id = $cField['field']['id']; break;}
+            }
+            if($cf_auto_id == -1) echo 'Log: Error. Not exist ID of custom fields from task #'.$result['tasks']['task']['id'];
+        }
+        //all necessary IDs are received
+        //get tasks from Planfix...
+        if($log_level > 1) echo 'Log: Try get Rent Tasks from Planfix.<br>';
+        $pageNum = 1;
+        $tasks_cars = array();
+        while(true){
+            $method = 'task.getList';
+            $params = array(
+                'pageSize' => 100,
+                'pageCurrent' => $pageNum,
+                'project' => array('id' => $projectRent_id),
+                'target' => 'all',
+                'filter' => 'ACTIVE'
+            );
+            $result = $PF->api($method, $params);
+            if(!isset($result['data']['tasks']['task'])) break; //если задачи закончились - выйти.
+            $tasks_cars = array_merge($tasks_cars, $result['data']['tasks']['task']);
+            $pageNum++;
+            usleep(1100000); //Planfix Restriction
+        }
+        if($log_level > 1) echo 'Log: Try get Repair Tasks from Planfix.<br>';
+        $pageNum = 1;
+        while(true){
+            $method = 'task.getList';
+            $params = array(
+                'pageSize' => 100,
+                'pageCurrent' => $pageNum,
+                'project' => array('id' => $projectRepair_id),
+                'target' => 'all',
+                'filter' => 'ACTIVE'
+            );
+            $result = $PF->api($method, $params);
+            if(!isset($result['data']['tasks']['task'])) break; //если задачи закончились - выйти.
+            if($result['data']['tasks']['@attributes']['count'] == 1){
+                $tasks_cars = array_merge($tasks_cars, array(count($tasks_cars) => $result['data']['tasks']['task']));
+                break;
+            }
+            else $tasks_cars = array_merge($tasks_cars, $result['data']['tasks']['task']);
+            $pageNum++;
+            usleep(1100000); //Planfix Restriction
+        }
+        //get analitic by condition
+        if($log_level > 1) echo 'Log: Try get analitic\'s datas from Planfix.<br>';
+        $pageNum = 1;
+        $dateBegin = new DateTime(now);
+        while(true){
+            $method = 'analitic.getDataByCondition';
+            $params = array(
+                'pageSize' => 100,
+                'pageCurrent' => $pageNum,
+                'analitic' => array('id' => $analiticBooking_id),
+                'filters' => array('filter' => array(
+                                'field' => $dateBegin_id,
+                                'fromDate' => $dateBegin->format('Y-m-d H:i:s'),
+                             )
+                ),
+            );
+            $result = $PF->api($method, $params);
+            if(!isset($result['data']['analiticDatas']['analiticData'])) break; //если задачи закончились - выйти.
+            /*if($result['data']['tasks']['@attributes']['count'] == 1){
+                $tasks_cars = array_merge($tasks_cars, array(count($tasks_cars) => $result['data']['tasks']['task']));
+                break;
+            }
+            else $tasks_cars = array_merge($tasks_cars, $result['data']['tasks']['task']);
+            */
+            print_r($result);
+            $pageNum++;
+            usleep(1100000); //Planfix Restriction
+        }
+
+
+
+        //client_id
+        //car_id
+        //company_id
+        //date_begin
+        //date_end
+        //pf_task_id
+
+        echo '';
     } //компания
         unset($PF);
 
