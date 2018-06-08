@@ -290,7 +290,7 @@ $handbook_clients_map = array(
                         print "Не удалось выполнить процессор ".$action;
                         return;
                     }
-                    if($log_level > 1) echo 'Log: Clients is processed (action: "'.$action.'", client: "'.$param['pf_client_userid'].'"<br>';
+                    if($log_level > 1) echo 'Log: Clients is processed (action: "'.$action.'", client: "'.$param['pf_client_userid'].'")<br>';
                 }
             }
             if($log_level > 0) echo 'Log: Clients - is completed.<br>';
@@ -362,10 +362,16 @@ $handbook_clients_map = array(
         $result = $PF->api($method, $params);
         if($result['success'] != 1) echo 'Log: Error until get Task (Rent Project) for getting IDx of Custom Fields from Planfix.';
         else{
-            foreach($result['data']['tasks']['task']['customData'] as $key => $cField){
-                if($cField['field']['name'] == $company['pf_name_customField_car'])     {$cf_auto_id = $cField['field']['id']; break;}
+            if(isset($result['data']['tasks']['task']['customData']['customValue']['field'])){//if only one custom field in the task
+                if($result['data']['tasks']['task']['customData']['customValue']['field']['name'] == $company['pf_name_customField_car'])
+                    $cf_auto_id = $result['data']['tasks']['task']['customData']['customValue']['field']['id'];
             }
-            if($cf_auto_id == -1) echo 'Log: Error. Not exist ID of custom fields from task #'.$result['tasks']['task']['id'];
+            else{ //if more than one custom fields in the task
+                foreach($result['data']['tasks']['task']['customData']['customValue'] as $key => $cField){
+                    if($cField['field']['name'] == $company['pf_name_customField_car'])     {$cf_auto_id = $cField['field']['id']; break;}
+                }
+                if($cf_auto_id == -1) echo 'Log: Error. Not exist ID of custom fields from task #'.$result['tasks']['task']['id'];
+            }
         }
         //all necessary IDs are received
         //get tasks from Planfix...
@@ -412,6 +418,8 @@ $handbook_clients_map = array(
         if($log_level > 1) echo 'Log: Try get analitic\'s datas from Planfix.<br>';
         $pageNum = 1;
         $dateBegin = new DateTime(now);
+        $dateEnd = date('d-m-Y H:i', strtotime('+1 year')); //plus one year
+        $analitic_data = array();
         while(true){
             $method = 'analitic.getDataByCondition';
             $params = array(
@@ -420,33 +428,79 @@ $handbook_clients_map = array(
                 'analitic' => array('id' => $analiticBooking_id),
                 'filters' => array('filter' => array(
                                 'field' => $dateBegin_id,
-                                'fromDate' => $dateBegin->format('Y-m-d H:i:s'),
+                                'fromDate' => $dateBegin->format('d-m-Y H:i'),
+                                'toDate' => $dateEnd,
                              )
                 ),
             );
             $result = $PF->api($method, $params);
-            if(!isset($result['data']['analiticDatas']['analiticData'])) break; //если задачи закончились - выйти.
+            if(!isset($result['data']['analiticDatas']['analiticData'])) break; //если записи аналитики закончились - выйти.
+            $analitic_data = array_merge($analitic_data,$result['data']['analiticDatas']['analiticData']);
             /*if($result['data']['tasks']['@attributes']['count'] == 1){
                 $tasks_cars = array_merge($tasks_cars, array(count($tasks_cars) => $result['data']['tasks']['task']));
                 break;
             }
             else $tasks_cars = array_merge($tasks_cars, $result['data']['tasks']['task']);
             */
-            print_r($result);
             $pageNum++;
             usleep(1100000); //Planfix Restriction
         }
-
-
-
-        //client_id
-        //car_id
-        //company_id
-        //date_begin
-        //date_end
-        //pf_task_id
-
-        echo '';
+        //echo '<pre>';
+        //echo '<h3>Tasks_cars:</h3>';
+        //print_r($tasks_cars);
+        //echo '<h3>Analitic Data:</h3>';
+        //print_r($analitic_data);
+        //echo '</pre>';
+        $carsBooking_param = array();
+        foreach($analitic_data as $key => $analitic){
+            $carsBooking_param['company_id'] = $company['id'];
+            $carsBooking_param['datetime_begin'] = $analitic['itemData'][0]['value'];
+            $carsBooking_param['datetime_end'] = $analitic['itemData'][1]['value'];
+            $carsBooking_param['pf_task_id'] = $analitic['task']['id'];
+            $carsBooking_param['pf_action_id'] = $analitic['action']['id'];
+            foreach($tasks_cars as $key_task => $task){
+                if($task['id'] == $analitic['task']['id']){
+                    $carsBooking_param['client_id'] = $task['owner']['id'];
+                    if(isset($task['customData']['customValue']['field'])){ //only one custom field in the task
+                        if($task['customData']['customValue']['field']['id'] == $cf_auto_id && $cf_auto_id != -1)
+                            $carsBooking_param['car_id'] = $task['customData']['customValue']['value'];
+                    }
+                    else{ //more than one custom fields in the task
+                        foreach($task['customData']['customValue'] as $cfield){
+                            if($cfield['field']['id'] == $cf_auto_id && $cf_auto_id != -1){
+                                $carsBooking_param['car_id'] = $cfield['value'];
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            //echo '<h3>carsBooking_param is:</h3>';
+            //print_r($carsBooking_param);
+            //echo '</pre>';
+            //use class based processor for adding a carsBooking to DB
+            $action = 'carsBooking/create';
+            $context = 'dev';
+            //select needed processor (create or update)
+            $carsBookingDb = $pdo->getCollection('CarsBooking', array('company_id' => $company['id'], 'pf_task_id' => $carsBooking_param['pf_task_id'], 'pf_action_id' => $carsBooking_param['pf_action_id']));
+            foreach($carsBookingDb as $key => $carBookingDb){
+                if(($carBookingDb['company_id'] == $company['id']) && ($carBookingDb['pf_task_id'] == $carsBooking_param['pf_task_id']) && ($carBookingDb['pf_action_id'] == $carsBooking_param['pf_action_id'])){
+                    $action = 'carsBooking/update';
+                    $carsBooking_param['id'] = $carBookingDb['id'];
+                    $carsBooking_param = array_merge($carBookingDb,$carsBooking_param);
+                    break;
+                }
+            }
+            if(!$response = $modx->runProcessor($action, $carsBooking_param
+                , array(
+                    'processors_path' => $modx->getOption('pdotools_elements_path') . $context.'/processors/',
+                ))){
+                print "Не удалось выполнить процессор ".$action;
+                return;
+            }
+            if($log_level > 1) echo 'Log: CarsBooking is processed (action: "'.$action.'", pf_task: "'.$carsBooking_param['pf_task_id'].'", pf_action_id: "'.$carsBooking_param['pf_action_id'].'")<br>';
+        }
+        if($log_level > 0) echo 'Log: CarsBooking - is completed.<br>';
     } //компания
         unset($PF);
 

@@ -327,7 +327,7 @@ class Planfix_API {
                 $requestXml->$key = new SimpleXMLElement("<$key/>");
                 foreach($val as $key2 => $val2) {
                     if (is_array($val2)) {
-                        $this->importParams($requestXml->$key, $val2);
+                        $this->importParams($requestXml->$key, array($key2 => $val2));
                     } else {
                         $requestXml->$key->addChild($key2, $val2);
                     }
