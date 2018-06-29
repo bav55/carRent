@@ -324,12 +324,25 @@ class Planfix_API {
     protected function importParams($requestXml, $params) {
         foreach($params as $key => $val) {
             if (is_array($val)) {
-                $requestXml->$key = new SimpleXMLElement("<$key/>");
+                if(is_numeric($key)){
+                    echo 'key is numeric';
+                    $requestXml = new SimpleXMLElement("<$val/>");
+                }
+                else{
+                    $requestXml->$key = new SimpleXMLElement("<$key/>");
+                }
                 foreach($val as $key2 => $val2) {
                     if (is_array($val2)) {
-                        $this->importParams($requestXml->$key, array($key2 => $val2));
+                        if(!is_numeric($key2)){
+                            $this->importParams($requestXml->$key, array($key2 => $val2));
+                        }
+                        else{
+                            $this->importParams($requestXml, array($key2 => $val2));
+                        }
                     } else {
-                        $requestXml->$key->addChild($key2, $val2);
+                        if(!is_numeric($key)){ $requestXml->$key->addChild($key2, $val2);
+                        }
+                        else{ $requestXml->addChild($key2, $val2);}
                     }
                 }
             } else {
