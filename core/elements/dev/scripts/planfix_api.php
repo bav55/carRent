@@ -324,15 +324,37 @@ class Planfix_API {
     protected function importParams($requestXml, $params) {
         foreach($params as $key => $val) {
             if (is_array($val)) {
+                if (array_key_exists(0, $val)) {
+                    echo 'wait';
+                    foreach ($val as $key_num => $val_num) {
+                        $newElem[$key_num] = $requestXml->addChild($key);
+                        foreach ($val_num as $key2 => $val2) {
+                            if(is_array($val2)){
+                                if (is_array($val2)) {
+                                    $this->importParams($newElem[$key_num]->$key2, array($key2 => $val2));
+                                } else {
+                                    $newElem[$key_num]->$key2->addChild($key2, $val2);
+                                }
+                                echo 'is array';
+                            }
+                            else{
+                                $newElem[$key_num]->addChild($key2, $val2);
+                            }
+                        }
+                    }
+                    //echo $requestXml->asXML();
+                    return $requestXml;
+                }
                 $requestXml->$key = new SimpleXMLElement("<$key/>");
-                foreach($val as $key2 => $val2) {
+                foreach ($val as $key2 => $val2) {
                     if (is_array($val2)) {
                         $this->importParams($requestXml->$key, array($key2 => $val2));
                     } else {
                         $requestXml->$key->addChild($key2, $val2);
                     }
                 }
-            } else {
+            }
+            else {
                 $requestXml->addChild($key, $val);
             }
         }

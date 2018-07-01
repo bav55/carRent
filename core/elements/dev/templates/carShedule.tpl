@@ -116,7 +116,6 @@ function drawVisualization() {
 							'dateBegin':	changedBooking['start'],
 							'dateEnd':		changedBooking['end'],
 							'task_id':		changedBooking['pf_task_id'],
-                            'action_id':	changedBooking['action_id'],
 							'company_id':	{$_modx->user.company_id},
 							'user_id':		{$_modx->user.id},
 							'action':		'modifyBooking',
@@ -175,10 +174,7 @@ function drawVisualization() {
                             var data2 = $('form[name="form_add_booking"]').serialize();
                             timeline.cancelAdd(); //отменяем сейчас добавление. Данные остались, сохраним чуть позже.
 							$.post(document.location.href, data2, function(data_) {
-								// Выдаем ответ
-								$('#result').html(data_);
-								
-								drawVisualization();
+                                location.reload();
 								$("#modalForm").modal('hide');
 							});
 

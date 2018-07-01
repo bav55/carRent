@@ -299,10 +299,10 @@ $handbook_clients_map = array(
         //  get needed IDS from Planfix
         $projectRent_id     = -1; //ID of "Rent" project
         $projectRepair_id   = -1; //ID of "Repair" project
-        $analiticBooking_id = -1; //ID of "Car Booking" analitic
         $cf_auto_id         = -1; //ID of custom field "Car" from task's template "Rent"
-        $dateBegin_id       = -1; //ID of custom field of analitic (date_begin)
-        $dateEnd_id       = -1; //ID of custom field of analitic (date_end)
+        $dateBegin_id       = -1; //ID of custom field of task (date_begin)
+        $dateEnd_id         = -1; //ID of custom field of task (date_end)
+        $cf_client_id       = -1;
 
         if($log_level > 1) echo 'Log: Try get Projects from Planfix.<br>';
         $method = 'project.getList';
@@ -321,36 +321,6 @@ $handbook_clients_map = array(
             if(($projectRent_id == -1) || ($projectRepair_id == -1)) echo 'Log: Error. Not exist ID of Project(s) from Planfix. (projectRent_id = '.$projectRent_id.'), (projectRepair_id = '.$projectRepair_id.')';
         }
 
-        if($log_level > 1) echo 'Log: Try get Analitic "'.$company['pf_name_analitic_booking'].'" from Planfix.<br>';
-        $method = 'analitic.getList';
-        $params = array(
-            'account' => $company['pf_account']
-        );
-        $result = $PF->api($method, $params);
-        if($result['success'] != 1) echo 'Log: Error until get Analitic from Planfix.';
-        else{
-            foreach($result['data']['analitics']['analitic'] as $key => $analitic){
-                if($analitic['name'] == $company['pf_name_analitic_booking']){
-                    $analiticBooking_id = $analitic['id'];
-                    //get options by this analitic
-                    if($log_level > 1) echo 'Log: Try get options for Analitic "'.$company['pf_name_analitic_booking'].'" from Planfix.<br>';
-                    $method = 'analitic.getOptions';
-                    $params = array(
-                        'analitic' => array('id' => $analiticBooking_id)
-                    );
-                    $result_options = $PF->api($method, $params);
-                    if($result_options['success'] != 1) echo 'Log: Error until get Analitic from Planfix.';
-                    else{
-                        $dateBegin_id = $result_options['data']['analitic']['fields']['field'][0]['id'];
-                        $dateEnd_id = $result_options['data']['analitic']['fields']['field'][1]['id'];
-                    }
-                    if(($dateBegin_id == -1) || ($dateEnd_id == -1)) echo 'Log: Error get options for analitic (dateBegin and dateEnd).<br>';
-                    break;
-                }
-            }
-            if($analiticBooking_id == -1) echo 'Log: Error. Not exist ID of Analitic from Planfix.';
-        }
-
         if($log_level > 1) echo 'Log: Try get Task (Rent Project) for getting IDx of Custom Fields from Planfix.<br>';
         $method = 'task.getList';
         $params = array(
@@ -365,10 +335,21 @@ $handbook_clients_map = array(
             if(isset($result['data']['tasks']['task']['customData']['customValue']['field'])){//if only one custom field in the task
                 if($result['data']['tasks']['task']['customData']['customValue']['field']['name'] == $company['pf_name_customField_car'])
                     $cf_auto_id = $result['data']['tasks']['task']['customData']['customValue']['field']['id'];
+                if($result['data']['tasks']['task']['customData']['customValue']['field']['name'] == $company['pf_name_customField_dateBegin'])
+                    $cf_dateBegin_id = $result['data']['tasks']['task']['customData']['customValue']['field']['id'];
+                if($result['data']['tasks']['task']['customData']['customValue']['field']['name'] == $company['pf_name_customField_dateEnd'])
+                    $cf_dateEnd_id = $result['data']['tasks']['task']['customData']['customValue']['field']['id'];
+                if($result['data']['tasks']['task']['customData']['customValue']['field']['name'] == $company['pf_name_customField_client'])
+                    $cf_client_id = $result['data']['tasks']['task']['customData']['customValue']['field']['id'];
+
+
             }
             else{ //if more than one custom fields in the task
                 foreach($result['data']['tasks']['task']['customData']['customValue'] as $key => $cField){
-                    if($cField['field']['name'] == $company['pf_name_customField_car'])     {$cf_auto_id = $cField['field']['id']; break;}
+                    if($cField['field']['name'] == $company['pf_name_customField_car'])           {$cf_auto_id = $cField['field']['id'];}
+                    if($cField['field']['name'] == $company['pf_name_customField_dateBegin'])     {$cf_dateBegin_id = $cField['field']['id'];}
+                    if($cField['field']['name'] == $company['pf_name_customField_dateEnd'])       {$cf_dateEnd_id = $cField['field']['id'];}
+                    if($cField['field']['name'] == $company['pf_name_customField_client'])       {$cf_client_id = $cField['field']['id'];}
                 }
                 if($cf_auto_id == -1) echo 'Log: Error. Not exist ID of custom fields from task #'.$result['tasks']['task']['id'];
             }
@@ -414,66 +395,19 @@ $handbook_clients_map = array(
             $pageNum++;
             usleep(1100000); //Planfix Restriction
         }
-        //get analitic by condition
-        if($log_level > 1) echo 'Log: Try get analitic\'s datas from Planfix.<br>';
-        $pageNum = 1;
-        $dateBegin = new DateTime(now);
-        $dateEnd = date('d-m-Y H:i', strtotime('+1 year')); //plus one year
-        $analitic_data = array();
-        while(true){
-            $method = 'analitic.getDataByCondition';
-            $params = array(
-                'pageSize' => 100,
-                'pageCurrent' => $pageNum,
-                'analitic' => array('id' => $analiticBooking_id),
-                'filters' => array('filter' => array(
-                                'field' => $dateBegin_id,
-                                'fromDate' => $dateBegin->format('d-m-Y H:i'),
-                                'toDate' => $dateEnd,
-                             )
-                ),
-            );
-            $result = $PF->api($method, $params);
-            if(!isset($result['data']['analiticDatas']['analiticData'])) break; //если записи аналитики закончились - выйти.
-            $analitic_data = array_merge($analitic_data,$result['data']['analiticDatas']['analiticData']);
-            /*if($result['data']['tasks']['@attributes']['count'] == 1){
-                $tasks_cars = array_merge($tasks_cars, array(count($tasks_cars) => $result['data']['tasks']['task']));
-                break;
-            }
-            else $tasks_cars = array_merge($tasks_cars, $result['data']['tasks']['task']);
-            */
-            $pageNum++;
-            usleep(1100000); //Planfix Restriction
-        }
         //echo '<pre>';
-        //echo '<h3>Tasks_cars:</h3>';
-        //print_r($tasks_cars);
-        //echo '<h3>Analitic Data:</h3>';
-        //print_r($analitic_data);
-        //echo '</pre>';
+       // echo '<h3>Tasks_cars:</h3>';
+       // print_r($tasks_cars);
+
         $carsBooking_param = array();
-        foreach($analitic_data as $key => $analitic){
+        foreach($tasks_cars as $key_task => $task){
             $carsBooking_param['company_id'] = $company['id'];
-            $carsBooking_param['datetime_begin'] = $analitic['itemData'][0]['value'];
-            $carsBooking_param['datetime_end'] = $analitic['itemData'][1]['value'];
-            $carsBooking_param['pf_task_id'] = $analitic['task']['id'];
-            $carsBooking_param['pf_action_id'] = $analitic['action']['id'];
-            foreach($tasks_cars as $key_task => $task){
-                if($task['id'] == $analitic['task']['id']){
-                    $carsBooking_param['client_id'] = $task['owner']['id'];
-                    if(isset($task['customData']['customValue']['field'])){ //only one custom field in the task
-                        if($task['customData']['customValue']['field']['id'] == $cf_auto_id && $cf_auto_id != -1)
-                            $carsBooking_param['car_id'] = $task['customData']['customValue']['value'];
-                    }
-                    else{ //more than one custom fields in the task
-                        foreach($task['customData']['customValue'] as $cfield){
-                            if($cfield['field']['id'] == $cf_auto_id && $cf_auto_id != -1){
-                                $carsBooking_param['car_id'] = $cfield['value'];
-                                break;
-                            }
-                        }
-                    }
-                }
+            $carsBooking_param['pf_task_id'] = $task['id'];
+            $carsBooking_param['client_id'] = $task['owner']['id'];
+            foreach($task['customData']['customValue'] as $key2 => $cfield){
+                if($cfield['field']['id'] == $cf_auto_id && $cf_auto_id != -1) $carsBooking_param['car_id'] = $cfield['value'];
+                if($cfield['field']['id'] == $cf_dateBegin_id && $cf_dateBegin_id != -1) $carsBooking_param['datetime_begin'] = $cfield['value'];
+                if($cfield['field']['id'] == $cf_dateEnd_id && $cf_dateEnd_id != -1) $carsBooking_param['datetime_end'] = $cfield['value'];
             }
             //echo '<h3>carsBooking_param is:</h3>';
             //print_r($carsBooking_param);
@@ -482,9 +416,9 @@ $handbook_clients_map = array(
             $action = 'carsBooking/create';
             $context = 'dev';
             //select needed processor (create or update)
-            $carsBookingDb = $pdo->getCollection('CarsBooking', array('company_id' => $company['id'], 'pf_task_id' => $carsBooking_param['pf_task_id'], 'pf_action_id' => $carsBooking_param['pf_action_id']));
+            $carsBookingDb = $pdo->getCollection('CarsBooking', array('company_id' => $company['id'], 'pf_task_id' => $carsBooking_param['pf_task_id']));
             foreach($carsBookingDb as $key => $carBookingDb){
-                if(($carBookingDb['company_id'] == $company['id']) && ($carBookingDb['pf_task_id'] == $carsBooking_param['pf_task_id']) && ($carBookingDb['pf_action_id'] == $carsBooking_param['pf_action_id'])){
+                if(($carBookingDb['company_id'] == $company['id']) && ($carBookingDb['pf_task_id'] == $carsBooking_param['pf_task_id']) ){
                     $action = 'carsBooking/update';
                     $carsBooking_param['id'] = $carBookingDb['id'];
                     $carsBooking_param = array_merge($carBookingDb,$carsBooking_param);
@@ -498,7 +432,7 @@ $handbook_clients_map = array(
                 print "Не удалось выполнить процессор ".$action;
                 return;
             }
-            if($log_level > 1) echo 'Log: CarsBooking is processed (action: "'.$action.'", pf_task: "'.$carsBooking_param['pf_task_id'].'", pf_action_id: "'.$carsBooking_param['pf_action_id'].'")<br>';
+            if($log_level > 1) echo 'Log: CarsBooking is processed (action: "'.$action.'", pf_task: "'.$carsBooking_param['pf_task_id'].'")<br>';
         }
         if($log_level > 0) echo 'Log: CarsBooking - is completed.<br>';
     } //компания
