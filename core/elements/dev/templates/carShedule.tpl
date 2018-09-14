@@ -174,7 +174,7 @@ function drawVisualization() {
                             var data2 = $('form[name="form_add_booking"]').serialize();
                             timeline.cancelAdd(); //отменяем сейчас добавление. Данные остались, сохраним чуть позже.
 							$.post(document.location.href, data2, function(data_) {
-                                location.reload();
+                                location.reload(); //bad. temporary. need ajax refresh page
 								$("#modalForm").modal('hide');
 							});
 

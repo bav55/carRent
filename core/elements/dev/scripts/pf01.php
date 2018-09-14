@@ -37,7 +37,7 @@ $companies = $pdo->getCollection('Company', array('pf_account:!=' => ''));
 $handbook_cars_map = array(
   // Cars field                  => array(Handbook field name  => Handbook field id)
     'pf_handbook_fulltitle'      => array('Марка, Модель (гос. номер)' => ''),
-    'car_mark'                   => array('Марка автомобиля' => ''),
+    'car_mark'                   => array('Марка и модель' => ''),
     'car_model'                  => array('Модель' => ''),
     'car_year'                   => array('Год выпуска' => ''),
     'car_nomer'                  => array('Госномер' => ''),
@@ -107,7 +107,15 @@ $handbook_clients_map = array(
             $result = $PF->api($method, $params);
         if($result['success'] != 1) echo 'Log: Error until find Handbook:'.$company['pf_name_handbook_cars'];
         else{
-            $handBookCarsId = $result['data']['handbooks']['handbook']['id'];
+            if(count($result['data']['handbooks']['handbook']) > 1){ //имеется несколько справочников, нужно выбрать правильный
+                foreach ($result['data']['handbooks']['handbook'] as $key => $hbook){
+                    if($hbook['name'] == $company['pf_name_handbook_cars']){
+                        $handBookCarsId = $hbook['id'];
+                        break;
+                    }
+                }
+            }
+            else $handBookCarsId = $result['data']['handbooks']['handbook']['id'];
         }
         if(isset($handBookCarsId) && $handBookCarsId != -1){ //work with cars
         //Getting the structure of Handbook
@@ -167,7 +175,8 @@ $handbook_clients_map = array(
                 foreach($car_planfix['customData']['customValue'] as $key => $car_fields){
                     foreach($handbook_cars_map as $db_field => $pf_field){
                         if(is_array($pf_field) && in_array($car_fields['field']['id'],$pf_field)){
-                            $param[$db_field] = !is_array($car_fields['value'])? $car_fields['value']: '';
+                            //$param[$db_field] = !is_array($car_fields['value'])? $car_fields['value']: '';
+                            $param[$db_field] = !is_array($car_fields['value'])? $car_fields['text']: $car_fields['text'];
                             break;
                         }
                     }
