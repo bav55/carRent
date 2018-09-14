@@ -104,7 +104,7 @@ $types = $pdo->getCollection('Cars', array(), array(
         'groupby' => 'car_type'
     )
 );
-$opt_types = '<option value="0">' . $lex['allMark'] . '</option>';
+$opt_types = '<option value="0">' . $lex['allTypes'] . '</option>';
 foreach ($types as $key => $type_value){
     $selected = '';
     if($type == $type_value['car_type']) {
