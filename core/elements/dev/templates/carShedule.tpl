@@ -81,7 +81,7 @@ function drawVisualization() {
             // Create a JSON data table
             {$_modx->runSnippet('!getCarsBooking', ['company_id' => $company, 'user_id' => $user])}
             data = {$_modx->getPlaceholder('carsBooking')};
-
+            console.log(data);
             for (var i in data) {
                 data[i].start = new Date(data[i].start);
                 data[i].end = new Date(data[i].end);

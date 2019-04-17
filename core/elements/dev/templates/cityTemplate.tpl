@@ -19,7 +19,6 @@
     {set $ctx = $_modx->resource.context_key}
     {set $company = $_modx->user.company_id}
     {set $user = $_modx->user.id}
-
     {if $ctx == 'dev'}
         <script src="[[++assets_url]]components/themebootstrap/js/jquery.min.js"></script>
         <script src="[[++assets_url]][[*context_key]]/js/timeline.js"></script>
@@ -54,12 +53,38 @@
         <div class="formFilter">
             {include "file:$ctx/chunks/formFilter.tpl"}
         </div>
+        <div id="cars">
+            <div class="rows">
+                {$_modx->runSnippet('!pdoPage',[
+                    'element' => 'searchCars',
+                    'limit' => 1,
+                    'tpl' => '@FILE /chunks/cars.item.tpl',
+                    'tplPath' => '/core/elements/'~$ctx~'/',
+                    'ajaxMode' => 'button',
+                    'ajaxElemWrapper' => '#cars',
+                    'ajaxElemRows' => '#cars .rows',
+                    'ajaxElemMore' => '#cars .btn-more',
+                    'ajaxTplMore' => '@INLINE <button class="btn btn-default btn-more">[[%pdopage_more]]</button>',
+                    'ajaxElemPagination' => '#cars .pagination',
+                    'ajaxElemLink' => '#cars .pagination a',
+                    'setTotal' => true,
+                    'frontend_js'=> '[[+assetsUrl]]js/pdopage.js',
+                ])}
+            </div>
+            {$_modx->getPlaceholder('page.nav')}
+            <hr/><span>Найдено {$_modx->getPlaceholder('page.total')} вариантов</span>
+        </div>
         [[*content]]
     </section>
 </div>
 <footer class="disclaimer">
     <p>{include "file:$ctx/chunks/footer.tpl"}</p>
 </footer>
-
+<script>
+    pdoPage.callbacks['before'] = function(config) {
+        config['type'] = $('#type').val();
+        console.log('Конфиг перед загрузкой!', config);
+    };
+</script>
 </body>
 </html>

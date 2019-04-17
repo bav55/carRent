@@ -11,15 +11,17 @@
             {$_modx->getPlaceholder('types')}
         </select>
     </div>
+    <!--
     <div class="form-group">
         <label class="sr-only" for="mark_model">Марка и модель</label>
         <select class="form-control" name="mark_model" id="mark_model">
             {$_modx->getPlaceholder('mark_models')}
         </select>
     </div>
+    -->
     <div class="form-group">
         <div class="input-group date" id="dpBegin">
-            <input type="text" class="form-control" value="{$_modx->getPlaceholder('dateBegin')}"/>
+            <input type="text" class="form-control" name="dateBegin" value="{$_modx->getPlaceholder('dateBegin')}"/>
             <span class="input-group-addon">
             <i class="glyphicon glyphicon-calendar"></i>
         </span>
@@ -27,7 +29,7 @@
     </div>
     <div class="form-group">
         <div class="input-group date" id="dpEnd">
-            <input type="text" class="form-control" value="{$_modx->getPlaceholder('dateEnd')}"/>
+            <input type="text" class="form-control" name="dateEnd" value="{$_modx->getPlaceholder('dateEnd')}"/>
             <span class="input-group-addon">
             <i class="glyphicon glyphicon-calendar"></i>
         </span>
@@ -41,11 +43,11 @@
         // инициализация dpBegin и dpEnd для обработки периода времени
         $("#dpBegin").datetimepicker({
             locale: 'RU',
-            format: 'DD.MM.YYYY',
+            format: 'DD.MM.YYYY HH:mm',
         });
         $("#dpEnd").datetimepicker({
             locale: 'RU',
-            format: 'DD.MM.YYYY',
+            format: 'DD.MM.YYYY HH:mm',
             useCurrent: false
         });
         $("#dpBegin").on("dp.change", function (e) {

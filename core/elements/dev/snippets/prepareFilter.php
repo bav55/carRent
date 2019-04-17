@@ -115,14 +115,12 @@ foreach ($types as $key => $type_value){
 
 //dateBegin
 if($dateBegin == ''){
-    $d = strtotime("+1 day");
-    $dateBegin = date("d.m.Y", $d);
+    $dateBegin = date("d.m.Y", strtotime("+1 day"));
 }
 
 //dateEnd
 if($dateEnd == ''){
-    $d = strtotime("+14 day");
-    $dateEnd = date("d.m.Y", $d);
+    $dateEnd = date("d.m.Y", strtotime("+14 day"));
 }
 
 $modx->setPlaceholder($city_pls, $opt_cities);

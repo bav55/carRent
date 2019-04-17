@@ -176,7 +176,8 @@ switch ($_POST['action']) {
             $carBooking['datetime_begin'] = $dateBegin_value->format('d-m-Y H:i');
             $carBooking['datetime_end'] = $dateEnd_value->format('d-m-Y H:i');
             $carBooking['pf_task_id'] = $task_id;
-            $carBooking['car_id'] = $car['pf_handbook_key'];
+            //$carBooking['car_id'] = $car['pf_handbook_key'];
+            $carBooking['car_id'] = $car['id'];
             $carBooking['company_id'] = $company_id;
             $carBooking['client_id'] = $_POST['selectClient'];
             $context = 'dev';

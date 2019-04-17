@@ -414,7 +414,10 @@ $handbook_clients_map = array(
             $carsBooking_param['pf_task_id'] = $task['id'];
             $carsBooking_param['client_id'] = $task['owner']['id'];
             foreach($task['customData']['customValue'] as $key2 => $cfield){
-                if($cfield['field']['id'] == $cf_auto_id && $cf_auto_id != -1) $carsBooking_param['car_id'] = $cfield['value'];
+                if($cfield['field']['id'] == $cf_auto_id && $cf_auto_id != -1){
+                    $car_data = $pdo->getCollection('Cars', array('company_id' => $company['id'], 'pf_handbook_key' => $cfield['value']));
+                    $carsBooking_param['car_id'] = $car_data[0]['id'];
+                }
                 if($cfield['field']['id'] == $cf_dateBegin_id && $cf_dateBegin_id != -1) $carsBooking_param['datetime_begin'] = $cfield['value'];
                 if($cfield['field']['id'] == $cf_dateEnd_id && $cf_dateEnd_id != -1) $carsBooking_param['datetime_end'] = $cfield['value'];
             }
